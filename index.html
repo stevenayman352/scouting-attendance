@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نظام حضور الكشافة</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #105E41;
+      --primary-light: #1a8a61;
+      --primary-dark: #0a3d2b;
+      --glass-bg: rgba(255, 255, 255, 0.07);
+      --glass-border: rgba(255, 255, 255, 0.15);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      --accent: #34d399;
+      --accent2: #6ee7b7;
+      --text: #e8f5f0;
+      --text-muted: rgba(232, 245, 240, 0.6);
+    }
+
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background: linear-gradient(135deg, #071c12 0%, #0d3b26 40%, #105E41 80%, #0a2e1e 100%);
+      min-height: 100vh;
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* Animated background blobs */
+    .bg-blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.18;
+      pointer-events: none;
+      animation: blobFloat 8s ease-in-out infinite alternate;
+      z-index: 0;
+    }
+
+    .bg-blob-1 {
+      width: 600px;
+      height: 600px;
+      background: #105E41;
+      top: -150px;
+      right: -150px;
+      animation-duration: 9s;
+    }
+
+    .bg-blob-2 {
+      width: 400px;
+      height: 400px;
+      background: #34d399;
+      bottom: -100px;
+      left: -100px;
+      animation-duration: 7s;
+    }
+
+    .bg-blob-3 {
+      width: 300px;
+      height: 300px;
+      background: #1a8a61;
+      top: 40%;
+      left: 30%;
+      animation-duration: 11s;
+    }
+
+    @keyframes blobFloat {
+      from {
+        transform: translate(0, 0) scale(1);
+      }
+
+      to {
+        transform: translate(30px, 20px) scale(1.05);
+      }
+    }
+
+    /* Glassmorphism card */
+    .glass {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-radius: 24px;
+    }
+
+    .glass-dark {
+      background: rgba(10, 40, 26, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 16px;
+    }
+
+    /* Steps indicator */
+    .step-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: all 0.4s ease;
+    }
+
+    .step-dot.active {
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+      width: 32px;
+      border-radius: 6px;
+    }
+
+    .step-dot.done {
+      background: var(--primary-light);
+    }
+
+    /* Inputs */
+    .inp {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'Tajawal', sans-serif;
+      font-size: 1rem;
+      padding: 0.65rem 1rem;
+      width: 100%;
+      transition: border-color 0.25s, box-shadow 0.25s;
+      outline: none;
+    }
+
+    .inp:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.15);
+    }
+
+    .inp::placeholder {
+      color: var(--text-muted);
+    }
+
+    select.inp option {
+      background: #0d3b26;
+      color: #e8f5f0;
+    }
+
+    textarea.inp {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    /* Buttons */
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+      border: none;
+      border-radius: 14px;
+      color: #fff;
+      font-family: 'Tajawal', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 0.75rem 2rem;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 20px rgba(16, 94, 65, 0.5);
+      letter-spacing: 0.02em;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(16, 94, 65, 0.6);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-accent {
+      background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+      border: none;
+      border-radius: 14px;
+      color: #071c12;
+      font-family: 'Tajawal', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 800;
+      padding: 0.75rem 2rem;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(52, 211, 153, 0.4);
+    }
+
+    .btn-accent:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(52, 211, 153, 0.55);
+    }
+
+    .btn-accent:active {
+      transform: translateY(0);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      color: var(--text);
+      font-family: 'Tajawal', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0.6rem 1.4rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    /* Patrol cards */
+    .patrol-card {
+      cursor: pointer;
+      transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: var(--glass-bg);
+      backdrop-filter: blur(14px);
+      padding: 1.25rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .patrol-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .patrol-card.saved {
+      border-color: var(--accent);
+      background: rgba(52, 211, 153, 0.08);
+    }
+
+    .patrol-card .patrol-icon {
+      font-size: 2.2rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .patrol-card .patrol-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .patrol-card .patrol-status {
+      font-size: 0.8rem;
+      margin-top: 0.3rem;
+    }
+
+    .patrol-card.saved .patrol-status {
+      color: var(--accent);
+    }
+
+    .patrol-card:not(.saved) .patrol-status {
+      color: var(--text-muted);
+    }
+
+    /* Saved badge */
+    .saved-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: var(--accent);
+      color: #071c12;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    /* Summary table */
+    .summary-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .summary-table th {
+      background: rgba(16, 94, 65, 0.5);
+      color: var(--accent2);
+      font-size: 0.88rem;
+      font-weight: 700;
+      padding: 0.75rem 1rem;
+      text-align: center;
+    }
+
+    .summary-table th:first-child {
+      border-radius: 0 12px 0 0;
+    }
+
+    .summary-table th:last-child {
+      border-radius: 12px 0 0 0;
+    }
+
+    .summary-table td {
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      padding: 0.7rem 1rem;
+      font-size: 0.92rem;
+      text-align: center;
+      vertical-align: top;
+    }
+
+    .summary-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .summary-table tr:hover td {
+      background: rgba(52, 211, 153, 0.05);
+    }
+
+    .summary-table td:first-child {
+      font-weight: 700;
+      color: var(--accent2);
+    }
+
+    .total-row td {
+      background: rgba(16, 94, 65, 0.35) !important;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* Page transitions */
+    .page {
+      display: none;
+      animation: fadeSlide 0.4s ease forwards;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    @keyframes fadeSlide {
+      from {
+        opacity: 0;
+        transform: translateY(18px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Label */
+    .lbl {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+      font-weight: 500;
+      display: block;
+    }
+
+    /* Number badge */
+    .num-badge {
+      background: rgba(52, 211, 153, 0.15);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      border-radius: 8px;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.3rem;
+      padding: 0.3rem 0.8rem;
+      display: inline-block;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent);
+      margin: 1.5rem 0;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--primary-light);
+      border-radius: 3px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(52, 211, 153, 0.9);
+      color: #071c12;
+      font-family: 'Tajawal', sans-serif;
+      font-weight: 700;
+      padding: 0.8rem 2rem;
+      border-radius: 50px;
+      z-index: 9999;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      font-size: 1rem;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- BG Blobs -->
+  <div class="bg-blob bg-blob-1"></div>
+  <div class="bg-blob bg-blob-2"></div>
+  <div class="bg-blob bg-blob-3"></div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Main Container -->
+  <div style="position:relative;z-index:1;max-width:820px;margin:0 auto;padding:2rem 1rem;">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <div style="font-size:3rem;margin-bottom:0.5rem;">🦅</div>
+      <h1
+        style="font-size:2rem;font-weight:900;letter-spacing:-0.01em;background:linear-gradient(135deg,#6ee7b7,#34d399,#a7f3d0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;">
+        نظام حضور الكشافة</h1>
+      <p style="color:var(--text-muted);margin-top:0.4rem;font-size:0.95rem;">تسجيل ومتابعة حضور الطلائع الكشفية</p>
+    </div>
+
+    <!-- History Section -->
+    <div class="glass" style="padding:1.5rem;margin-bottom:2rem;" id="historySection">
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;">
+        <div
+          style="background:var(--accent);color:#071c12;font-size:0.8rem;font-weight:800;padding:3px 12px;border-radius:20px;">
+          التاريخ</div>
+        <h2 style="font-size:1.2rem;font-weight:800;margin:0;">آخر ٥ عمليات</h2>
+      </div>
+      <div id="historyList"></div>
+      <div id="noHistory" style="color:var(--text-muted);text-align:center;font-size:0.9rem;display:none;padding:1rem;">
+        لا توجد عمليات سابقة</div>
+    </div>
+
+    <!-- Steps indicator -->
+    <div style="display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:2.5rem;" id="stepsBar">
+      <div class="step-dot active" id="sd0"></div>
+      <div class="step-dot" id="sd1"></div>
+      <div class="step-dot" id="sd2"></div>
+      <div class="step-dot" id="sd3"></div>
+    </div>
+
+    <!-- ====== STEP 1: Setup ====== -->
+    <div class="page active" id="page0">
+      <div class="glass" style="padding:2.5rem 2rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.3rem;">
+          <div
+            style="background:var(--accent);color:#071c12;font-size:0.8rem;font-weight:800;padding:3px 12px;border-radius:20px;">
+            الخطوة ١</div>
+          <h2 style="font-size:1.4rem;font-weight:800;margin:0;">إعداد جلسة الحضور</h2>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:2rem;">حدد تاريخ اليوم والمرحلة الكشفية للبدء
+        </p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+          <div>
+            <label class="lbl">📅 تاريخ الجلسة</label>
+            <input type="date" class="inp" id="sessionDate" />
+          </div>
+          <div>
+            <label class="lbl">🏅 المرحلة (الفريق)</label>
+            <select class="inp" id="sessionTeam">
+              <option value="">-- اختر المرحلة --</option>
+              <option value="أشبال">أشبال</option>
+              <option value="مبتدأ-أ">مبتدأ-أ</option>
+              <option value="مبتدأ-ب">مبتدأ-ب</option>
+              <option value="متقدم">متقدم</option>
+              <option value="جوالة">جوالة</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div style="text-align:center;">
+          <button class="btn-primary" onclick="goStep1()">ابدأ تسجيل الحضور &larr;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== STEP 2: Patrol Grid ====== -->
+    <div class="page" id="page1">
+      <div class="glass" style="padding:2rem;">
+        <div
+          style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;flex-wrap:wrap;gap:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div
+              style="background:var(--accent);color:#071c12;font-size:0.8rem;font-weight:800;padding:3px 12px;border-radius:20px;">
+              الخطوة ٢</div>
+            <h2 style="font-size:1.4rem;font-weight:800;margin:0;">اختر الطليعة</h2>
+          </div>
+          <div id="sessionInfo" style="font-size:0.88rem;color:var(--text-muted);text-align:left;"></div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.75rem;">انقر على أي طليعة لإدخال بيانات
+          حضورها</p>
+
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;" id="patrolGrid"></div>
+
+        <div class="divider"></div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+          <button class="btn-ghost" onclick="goPage(0)">&#8594; رجوع</button>
+          <button class="btn-primary" onclick="goStep3()" id="viewReportBtn">عرض التقرير الكامل &#8592;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== STEP 3: Entry Form ====== -->
+    <div class="page" id="page2">
+      <div class="glass" style="padding:2rem;">
+        <div
+          style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;flex-wrap:wrap;gap:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div
+              style="background:var(--accent);color:#071c12;font-size:0.8rem;font-weight:800;padding:3px 12px;border-radius:20px;">
+              الخطوة ٣</div>
+            <h2 style="font-size:1.4rem;font-weight:800;margin:0;" id="entryPatrolTitle">إدخال بيانات الطليعة</h2>
+          </div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.75rem;">أدخل بيانات الحضور والغياب لهذه
+          الطليعة</p>
+
+        <!-- Power & Present -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem;">
+          <div>
+            <label class="lbl">👥 أصل القوة (العدد الكلي)</label>
+            <input type="number" class="inp" id="inpTotal" placeholder="0" min="0" />
+          </div>
+          <div>
+            <label class="lbl">✅ الحضور</label>
+            <input type="number" class="inp" id="inpPresent" placeholder="0" min="0" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Excused -->
+        <div class="glass-dark" style="padding:1.25rem;margin-bottom:1.25rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="font-size:1.3rem;">📋</span>
+            <h3 style="font-size:1.05rem;font-weight:700;margin:0;color:var(--accent2);">الغياب بعذر</h3>
+          </div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:start;">
+            <div>
+              <label class="lbl">العدد</label>
+              <input type="number" class="inp" id="inpExcusedCount" placeholder="0" min="0" style="width:100px;" />
+            </div>
+            <div>
+              <label class="lbl">أسماء الغائبين بعذر (كل اسم في سطر)</label>
+              <textarea class="inp" id="inpExcusedNames" placeholder="أدخل الأسماء هنا..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unexcused -->
+        <div class="glass-dark" style="padding:1.25rem;margin-bottom:1.5rem;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;">
+            <span style="font-size:1.3rem;">🚫</span>
+            <h3 style="font-size:1.05rem;font-weight:700;margin:0;color:#fca5a5;">الغياب بدون عذر</h3>
+          </div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:1rem;align-items:start;">
+            <div>
+              <label class="lbl">العدد</label>
+              <input type="number" class="inp" id="inpUnexcusedCount" placeholder="0" min="0" style="width:100px;" />
+            </div>
+            <div>
+              <label class="lbl">أسماء الغائبين بدون عذر (كل اسم في سطر)</label>
+              <textarea class="inp" id="inpUnexcusedNames" placeholder="أدخل الأسماء هنا..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+          <button class="btn-ghost" onclick="goPage(1)">&#8594; رجوع للطلايع</button>
+          <button class="btn-primary" onclick="console.log('Button clicked'); savePatrol();">💾 حفظ بيانات الطليعة</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== STEP 4: Report ====== -->
+    <div class="page" id="page3">
+      <div class="glass" style="padding:2rem;">
+        <div
+          style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.3rem;flex-wrap:wrap;gap:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div
+              style="background:var(--accent);color:#071c12;font-size:0.8rem;font-weight:800;padding:3px 12px;border-radius:20px;">
+              التقرير</div>
+            <h2 style="font-size:1.4rem;font-weight:800;margin:0;">التقرير الشامل</h2>
+          </div>
+          <div id="reportMeta" style="font-size:0.88rem;color:var(--text-muted);"></div>
+        </div>
+        <p style="color:var(--text-muted);font-size:0.9rem;margin-bottom:1.75rem;">ملخص كامل لبيانات الحضور جميع الطلائع
+        </p>
+
+        <!-- Summary Stats -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.85rem;margin-bottom:1.75rem;"
+          id="summaryStats"></div>
+
+        <!-- Table -->
+        <div style="overflow-x:auto;border-radius:16px;overflow:hidden;margin-bottom:1.75rem;">
+          <table class="summary-table" id="reportTable">
+            <thead>
+              <tr>
+                <th>الطليعة</th>
+                <th>أصل القوة</th>
+                <th>الحضور</th>
+                <th>غياب بعذر</th>
+                <th>أسماء (بعذر)</th>
+                <th>غياب بدون عذر</th>
+                <th>أسماء (بدون عذر)</th>
+              </tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.85rem;">
+          <button class="btn-ghost" onclick="goPage(1)">&#8594; رجوع للطلايع</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end main container -->
+
+  <script>
+    // =========================================
+    // FIREBASE INIT
+    // =========================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAvrf4hfhfmtLX5ipehOvZ75FsaVxRd7qQ",
+      authDomain: "tmam-yomi.firebaseapp.com",
+      projectId: "tmam-yomi",
+      storageBucket: "tmam-yomi.firebasestorage.app",
+      messagingSenderId: "899126058482",
+      appId: "1:899126058482:web:56c25c574766c2aecd9f6b"
+    };
+
+    let app, db;
+    try {
+      app = firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      console.log('Firebase initialized successfully');
+    } catch (e) {
+      console.error('Firebase init error:', e);
+    }
+
+    // =========================================
+    // DATA
+    // =========================================
+    const PATROLS = [
+      { id: 'hawk', name: 'الصقور', icon: '🦅' },
+      { id: 'eagles', name: 'النسور', icon: '🦆' },
+      { id: 'crow', name: 'الغراب', icon: '🐦‍⬛' },
+      { id: 'kestrel', name: 'البواشق', icon: '🦉' },
+      { id: 'falcon', name: 'الشاهين', icon: '🦜' },
+      { id: 'aquila', name: 'العقاب', icon: '🦚' },
+    ];
+
+    let state = {
+      date: '',
+      team: '',
+      currentPatrol: null,
+      data: {}   // keyed by patrol id
+    };
+
+    // =========================================
+    // NAVIGATION
+    // =========================================
+    function goPage(n) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById('page' + n).classList.add('active');
+      // Trigger re-animation
+      const pg = document.getElementById('page' + n);
+      pg.style.animation = 'none';
+      pg.offsetHeight; // reflow
+      pg.style.animation = '';
+      updateSteps(n);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateSteps(n) {
+      [0, 1, 2, 3].forEach(i => {
+        const d = document.getElementById('sd' + i);
+        d.className = 'step-dot';
+        if (i < n) d.classList.add('done');
+        else if (i === n) d.classList.add('active');
+      });
+    }
+
+    // =========================================
+    // STEP 1 → STEP 2
+    // =========================================
+    function goStep1() {
+      const date = document.getElementById('sessionDate').value;
+      const team = document.getElementById('sessionTeam').value;
+      if (!date) { showToast('⚠️ يرجى تحديد التاريخ'); return; }
+      if (!team) { showToast('⚠️ يرجى اختيار المرحلة'); return; }
+      state.date = date;
+      state.team = team;
+      state.data = {};
+
+      showToast('⏳ جاري تحميل البيانات...');
+
+      // Try localStorage first
+      const localKey = `attendance_${team}_${date}`;
+      const localData = localStorage.getItem(localKey);
+      if (localData) {
+        try {
+          state.data = JSON.parse(localData);
+          showToast('✅ تم تحميل البيانات المحفوظة محلياً');
+          buildPatrolGrid();
+          document.getElementById('sessionInfo').innerHTML =
+            `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+          goPage(1);
+          return;
+        } catch (e) { console.error('Local parse error:', e); }
+      }
+
+      // Try Firebase if available
+      if (db) {
+        db.collection('attendance').doc(`${team}_${date}`).get()
+          .then((doc) => {
+            if (doc.exists) {
+              const savedData = doc.data();
+              state.data = savedData.patrols || {};
+              showToast('✅ تم تحميل البيانات المحفوظة');
+            } else {
+              showToast('📝 لا توجد بيانات سابقة لهذا الفريق والتاريخ');
+            }
+            buildPatrolGrid();
+            document.getElementById('sessionInfo').innerHTML =
+              `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+            goPage(1);
+          })
+          .catch((err) => {
+            console.error('Error loading from Firebase:', err);
+            showToast('📝 لا توجد بيانات سابقة لهذا الفريق والتاريخ');
+            buildPatrolGrid();
+            document.getElementById('sessionInfo').innerHTML =
+              `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+            goPage(1);
+          });
+      } else {
+        showToast('📝 لا توجد بيانات سابقة لهذا الفريق والتاريخ');
+        buildPatrolGrid();
+        document.getElementById('sessionInfo').innerHTML =
+          `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+        goPage(1);
+      }
+    }
+
+  // Try Firebase if available
+  if (db) {
+    db.collection('attendance').doc(`${team}_${date}`).get()
+      .then((doc) => {
+        if (doc.exists) {
+          const savedData = doc.data();
+          state.data = savedData.patrols || {};
+          showToast('✅ تم تحميل البيانات المحفوظة');
+        } else {
+          showToast('📝 لا توجد بيانات سابقة لهذا الفريق والتاريخ');
+        }
+        buildPatrolGrid();
+        document.getElementById('sessionInfo').innerHTML =
+          `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+        goPage(1);
+      })
+      .catch((err) => {
+        console.error('Error loading from Firebase:', err);
+        showToast('📝 لا توجد بيانات لهذا الفريق والتاريخ');
+        buildPatrolGrid();
+        document.getElementById('sessionInfo').innerHTML =
+          `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+        goPage(1);
+      });
+  } else {
+    showToast('📝 لا توجد بيانات سابقة لهذا الفريق والتاريخ');
+    buildPatrolGrid();
+    document.getElementById('sessionInfo').innerHTML =
+      `📅 ${formatDate(date)} &nbsp;|&nbsp; 🏅 ${team}`;
+    goPage(1);
+  }
+}
+
+    function formatDate(d) {
+      if (!d) return '';
+      const [y, m, day] = d.split('-');
+      return `${day}/${m}/${y}`;
+    }
+
+    // =========================================
+    // STEP 2: Patrol Grid
+    // =========================================
+    function buildPatrolGrid() {
+      const grid = document.getElementById('patrolGrid');
+      grid.innerHTML = '';
+      PATROLS.forEach(p => {
+        const saved = !!state.data[p.id];
+        const card = document.createElement('div');
+        card.className = 'patrol-card' + (saved ? ' saved' : '');
+        card.innerHTML = `
+      ${saved ? '<div class="saved-badge">✓ محفوظ</div>' : ''}
+      <div class="patrol-icon">${p.icon}</div>
+      <div class="patrol-name">${p.name}</div>
+      <div class="patrol-status">${saved ? 'تم الحفظ' : 'لم يُدخل بعد'}</div>
+    `;
+        card.onclick = () => openPatrol(p.id);
+        grid.appendChild(card);
+      });
+    }
+
+    // =========================================
+    // STEP 3: Entry Form
+    // =========================================
+    function openPatrol(id) {
+      state.currentPatrol = id;
+      const p = PATROLS.find(x => x.id === id);
+      document.getElementById('entryPatrolTitle').textContent = `${p.icon} طليعة ${p.name}`;
+
+      // Load existing data if any
+      const d = state.data[id] || {};
+      document.getElementById('inpTotal').value = d.total || '';
+      document.getElementById('inpPresent').value = d.present || '';
+      document.getElementById('inpExcusedCount').value = d.excusedCount || '';
+      document.getElementById('inpExcusedNames').value = d.excusedNames || '';
+      document.getElementById('inpUnexcusedCount').value = d.unexcusedCount || '';
+      document.getElementById('inpUnexcusedNames').value = d.unexcusedNames || '';
+
+      goPage(2);
+    }
+
+function savePatrol() {
+  const total = parseInt(document.getElementById('inpTotal').value) || 0;
+  const present = parseInt(document.getElementById('inpPresent').value) || 0;
+  const excusedCount = parseInt(document.getElementById('inpExcusedCount').value) || 0;
+  const excusedNames = document.getElementById('inpExcusedNames').value.trim();
+  const unexcusedCount = parseInt(document.getElementById('inpUnexcusedCount').value) || 0;
+  const unexcusedNames = document.getElementById('inpUnexcusedNames').value.trim();
+
+  state.data[state.currentPatrol] = { total, present, excusedCount, excusedNames, unexcusedCount, unexcusedNames };
+
+  // Save to localStorage as backup
+  const localKey = `attendance_${state.team}_${state.date}`;
+  localStorage.setItem(localKey, JSON.stringify(state.data));
+
+  if (!db) {
+    showToast('⚠️ تم الحفظ محلياً (بدون اتصال)');
+    buildPatrolGrid();
+    goPage(1);
+    return;
+  }
+
+  db.collection('attendance').doc(`${state.team}_${state.date}`).set({
+    team: state.team,
+    date: state.date,
+    patrols: state.data,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  })
+  .then(() => {
+    showToast('✅ تم حفظ بيانات الطليعة بنجاح');
+    buildPatrolGrid();
+    goPage(1);
+    loadHistory();
+  })
+  .catch((err) => {
+    console.error('Firebase save error:', err);
+    showToast('⚠️ تم الحفظ محلياً (خطأ في الاتصال)');
+    buildPatrolGrid();
+    goPage(1);
+  });
+}
+
+    // =========================================
+    // STEP 4: Report
+    // =========================================
+    function goStep3() {
+      const savedCount = Object.keys(state.data).length;
+      if (savedCount === 0) { showToast('⚠️ لم يتم إدخال بيانات أي طليعة بعد'); return; }
+
+      buildReport();
+      goPage(3);
+    }
+
+    function buildReport() {
+      document.getElementById('reportMeta').innerHTML =
+        `📅 ${formatDate(state.date)} &nbsp;|&nbsp; 🏅 ${state.team}`;
+
+      let totTotal = 0, totPresent = 0, totEx = 0, totUnex = 0;
+      PATROLS.forEach(p => {
+        const d = state.data[p.id];
+        if (!d) return;
+        totTotal += d.total;
+        totPresent += d.present;
+        totEx += d.excusedCount;
+        totUnex += d.unexcusedCount;
+      });
+
+      const pct = totTotal > 0 ? Math.round((totPresent / totTotal) * 100) : 0;
+
+      document.getElementById('summaryStats').innerHTML = `
+    ${statCard('👥', 'أصل القوة', totTotal, '#6ee7b7')}
+    ${statCard('✅', 'إجمالي الحضور', totPresent, '#34d399')}
+    ${statCard('📋', 'غياب بعذر', totEx, '#fcd34d')}
+    ${statCard('🚫', 'غياب بدون عذر', totUnex, '#f87171')}
+  `;
+
+      const tbody = document.getElementById('reportBody');
+      tbody.innerHTML = '';
+      PATROLS.forEach(p => {
+        const d = state.data[p.id];
+        if (!d) return;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+      <td>${p.icon} ${p.name}</td>
+      <td><span class="num-badge">${d.total}</span></td>
+      <td><span class="num-badge">${d.present}</span></td>
+      <td>${d.excusedCount}</td>
+      <td style="font-size:0.82rem;text-align:right;white-space:pre-line;max-width:140px;">${d.excusedNames || '—'}</td>
+      <td>${d.unexcusedCount}</td>
+      <td style="font-size:0.82rem;text-align:right;white-space:pre-line;max-width:140px;">${d.unexcusedNames || '—'}</td>
+    `;
+        tbody.appendChild(tr);
+      });
+
+      // Totals row
+      const trTotal = document.createElement('tr');
+      trTotal.className = 'total-row';
+      trTotal.innerHTML = `
+    <td>الإجمالي الكلي</td>
+    <td>${totTotal}</td>
+    <td>${totPresent} (${pct}%)</td>
+    <td>${totEx}</td>
+    <td>—</td>
+    <td>${totUnex}</td>
+    <td>—</td>
+  `;
+      tbody.appendChild(trTotal);
+    }
+
+    function statCard(icon, label, val, color) {
+      return `
+    <div class="glass-dark" style="padding:1rem;text-align:center;">
+      <div style="font-size:1.6rem;">${icon}</div>
+      <div style="font-size:1.6rem;font-weight:800;color:${color};line-height:1.2;">${val}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem;">${label}</div>
+    </div>
+  `;
+    }
+
+// =========================================
+// HISTORY
+// =========================================
+function loadHistory() {
+  const historyList = document.getElementById('historyList');
+  const noHistory = document.getElementById('noHistory');
+  historyList.innerHTML = '';
+  noHistory.style.display = 'none';
+
+  let historyItems = [];
+
+  // Load from localStorage
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('attendance_')) {
+      const parts = key.replace('attendance_', '').split('_');
+      const team = parts.slice(0, -1).join('_');
+      const date = parts[parts.length - 1];
+      historyItems.push({ team, date, source: 'local' });
+    }
+  }
+
+  // Try Firebase if available
+  if (db) {
+    db.collection('attendance')
+      .orderBy('updatedAt', 'desc')
+      .limit(5)
+      .get()
+      .then((snapshot) => {
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          historyItems.push({ team: data.team, date: data.date, source: 'firebase' });
+        });
+        displayHistory(historyItems.slice(0, 5));
+      })
+      .catch((err) => {
+        console.error('Firebase history error:', err);
+        displayHistory(historyItems.slice(0, 5));
+      });
+  } else {
+    displayHistory(historyItems.slice(0, 5));
+  }
+}
+
+function displayHistory(items) {
+  const historyList = document.getElementById('historyList');
+  const noHistory = document.getElementById('noHistory');
+
+  if (items.length === 0) {
+    noHistory.style.display = 'block';
+    return;
+  }
+
+  items.forEach(item => {
+    const formattedDate = formatDate(item.date);
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'glass-dark';
+    itemDiv.style.padding = '0.75rem 1rem';
+    itemDiv.style.display = 'flex';
+    itemDiv.style.justifyContent = 'space-between';
+    itemDiv.style.alignItems = 'center';
+    itemDiv.style.flexWrap = 'wrap';
+    itemDiv.style.gap = '0.5rem';
+
+    itemDiv.innerHTML = `
+      <div>
+        <div style="font-weight:700;font-size:0.95rem;">🏅 ${item.team} &nbsp;|&nbsp; 📅 ${formattedDate}</div>
+      </div>
+      <button class="btn-ghost" style="padding:0.4rem 1rem;font-size:0.85rem;" onclick="viewHistoryReport('${item.team}', '${item.date}')">عرض التقرير ←</button>
+    `;
+
+    historyList.appendChild(itemDiv);
+  });
+}
+
+function viewHistoryReport(team, date) {
+  // Try localStorage first
+  const localKey = `attendance_${team}_${date}`;
+  const localData = localStorage.getItem(localKey);
+
+  if (localData) {
+    try {
+      state.team = team;
+      state.date = date;
+      state.data = JSON.parse(localData);
+      buildReport();
+      updateSteps(3);
+      goPage(3);
+      return;
+    } catch (e) { console.error('Local parse error:', e); }
+  }
+
+  // Try Firebase
+  if (db) {
+    db.collection('attendance').doc(`${team}_${date}`).get()
+      .then((doc) => {
+        if (doc.exists) {
+          const data = doc.data();
+          state.team = team;
+          state.date = date;
+          state.data = data.patrols || {};
+          buildReport();
+          updateSteps(3);
+          goPage(3);
+        } else {
+          showToast('⚠️ لا توجد بيانات لهذا السجل');
+        }
+      })
+      .catch((err) => {
+        console.error('Error viewing history:', err);
+        showToast('❌ خطأ في تحميل التقرير');
+      });
+  } else {
+    showToast('❌ لا توجد بيانات محلية لهذا السجل');
+  }
+}
+
+    // =========================================
+    // TOAST
+    // =========================================
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    // =========================================
+    // INIT: Set today's date
+    // =========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('sessionDate').value = today;
+      loadHistory();
+    });
+  </script>
+</body>
+
+</html>

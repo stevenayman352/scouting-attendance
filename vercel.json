@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "scouting-attendance",
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    }
+  ]
+}
